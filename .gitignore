@@ -1,0 +1,14 @@
+# Build output (contains absolute paths from the build machine, e.g. C:\Users\<name>\.nuget)
+bin/
+obj/
+TestResults/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Local design notes, not part of the app
+SKILL_UI.md
