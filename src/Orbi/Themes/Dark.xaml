@@ -1,0 +1,33 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Frosted look without real blur: soft vertical gradients + a faint top edge -->
+    <LinearGradientBrush x:Key="RingBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#661E1D20" Offset="0"/>
+        <GradientStop Color="#401E1D20" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="GlassEdgeBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#4DFFFFFF" Offset="0"/>
+        <GradientStop Color="#0AFFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#F73D3B40" Offset="0"/>
+        <GradientStop Color="#F72A282D" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PanelBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#F7363439" Offset="0"/>
+        <GradientStop Color="#FA242226" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="AccentBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF6A4F" Offset="0"/>
+        <GradientStop Color="#E5382A" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="StrokeBrush" Color="#26FFFFFF"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#F5F3F1"/>
+    <SolidColorBrush x:Key="SubTextBrush" Color="#A8A19D"/>
+    <SolidColorBrush x:Key="ControlBrush" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="ControlHoverBrush" Color="#2BFFFFFF"/>
+    <SolidColorBrush x:Key="HoverOverlayBrush" Color="#17FFFFFF"/>
+    <SolidColorBrush x:Key="RingTextBrush" Color="#F5F3F1"/>
+    <SolidColorBrush x:Key="RingSubTextBrush" Color="#A8A19D"/>
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF"/>
+</ResourceDictionary>
