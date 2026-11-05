@@ -97,3 +97,55 @@ public class DdcTests
     [InlineData(0xD6, false)]  // power mode
     public void BlocksDangerousWrites(byte code, bool safe) => Assert.Equal(safe, Ddc.IsSafeToWrite(code));
 }
+
+public class PageStitchTests
+{
+    // header rows 1,2 · content 100..399 (a 300-row page) seen through a 100-row window · footer row 9
+    static int[] Frame(int scroll) => [1, 2, .. Enumerable.Range(100 + scroll, 100), 9];
+
+    [Fact]
+    public void FindsHeaderFooterAndScrollDistance()
+    {
+        int[] a = Frame(0), b = Frame(37);
+        Assert.Equal(2, PageStitch.SameRows(a, b, fromBottom: false));
+        Assert.Equal(1, PageStitch.SameRows(a, b, fromBottom: true));
+        Assert.Equal(37, PageStitch.FindScroll(a, b, 2, a.Length - 1));
+    }
+
+    [Fact]
+    public void EndOfPageAndLostTrack()
+    {
+        Assert.Equal(0, PageStitch.FindScroll(Frame(200), Frame(200), 2, 101)); // nothing moved
+        Assert.Equal(-1, PageStitch.FindScroll(Frame(0), Frame(150), 2, 101)); // jumped past the whole screen: no overlap
+    }
+
+    [Fact]
+    public void BlankRowsCantFakeAMatch()
+    {
+        int[] blank = [.. Enumerable.Repeat(5, 100)];
+        int[] a = [.. blank, .. Enumerable.Range(100, 20)], b = [.. Enumerable.Range(100, 20).Reverse(), .. blank];
+        Assert.Equal(-1, PageStitch.FindScroll(a, b, 0, a.Length));
+    }
+}
+
+public class PageStitchStaticRowsTests
+{
+    [Fact]
+    public void FixedHeaderInsideTheBandDoesNotSpoilTheMatch()
+    {
+        int[] header = [.. Enumerable.Range(1, 30)]; // big sticky header the first-frame detection missed
+        int[] a = [.. header, .. Enumerable.Range(100, 70)], b = [.. header, .. Enumerable.Range(120, 70)];
+        Assert.Equal(20, PageStitch.FindScroll(a, b, 0, a.Length));
+    }
+}
+
+public class PageStitchBlankTests
+{
+    [Fact]
+    public void BlankOverlapIsAcceptedOnlyAtTheExpectedDistance()
+    {
+        int[] a = [.. Enumerable.Range(1, 40), .. Enumerable.Repeat(0, 60)], b = [.. Enumerable.Range(21, 20), .. Enumerable.Repeat(0, 60), .. Enumerable.Range(500, 20)];
+        Assert.True(PageStitch.Fits(a, b, 0, 100, 20));
+        Assert.False(PageStitch.Fits(a, b, 0, 100, 5));
+    }
+}
