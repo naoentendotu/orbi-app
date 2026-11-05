@@ -14,7 +14,8 @@ namespace Orbi.Shell;
 /// <summary>Pie menu around the cursor + side panel (preview on hover, expanded on click).</summary>
 public partial class RadialWindow : Window
 {
-    const double C = 150, OuterR = 148, InnerR = 58, BaseW = 676, BaseH = 460, PanelW = 376;
+    const double C = 150, OuterR = 148, InnerR = 58, BaseW = 676, BaseH = 460, PanelW = 376,
+        Pad = 40; // transparent room around the content so drop shadows (blur 36 + depth 10) aren't cut by the window edge
     const double Gap = 3, Corner = 6, HoverLift = 5; // px between slices, slice corner radius, hover slide-out
 
     /// <summary>Set while a modal picker (file dialog) is open so losing focus doesn't close the widget.</summary>
@@ -85,8 +86,11 @@ public partial class RadialWindow : Window
             BackBtn.Visibility = Visibility.Collapsed;
             Opacity = s.Opacity;
             Root.LayoutTransform = new ScaleTransform(s.Scale, s.Scale);
-            Width = BaseW * s.Scale;
-            Height = BaseH * s.Scale;
+            Root.Margin = new Thickness(Pad * s.Scale);
+            // +1: pixel rounding of a scaled window can leave Root a fraction too small, and WPF then clips it
+            // (a hovered slice sliding past the ring's edge got cut, plus its shadow)
+            Width = (BaseW + 2 * Pad) * s.Scale + 1;
+            Height = (BaseH + 2 * Pad) * s.Scale + 1;
             PlaceNearCursor(s);
             Show();
             Topmost = false; Topmost = true; // jump above other always-on-top windows opened since last time
@@ -152,8 +156,10 @@ public partial class RadialWindow : Window
         Root.RenderTransformOrigin = new Point(panelLeft ? (BaseW - C) / BaseW : C / BaseW, 0.5);
         Panel.RenderTransformOrigin = new Point(panelLeft ? 1 : 0, 0.5);
 
-        Left = Math.Clamp(panelLeft ? cx - (Width - ring) : cx - ring, wa.Left, Math.Max(wa.Left, wa.Right - Width));
-        Top = Math.Clamp(cy - Height / 2, wa.Top, Math.Max(wa.Top, wa.Bottom - Height));
+        // the transparent padding may hang off-screen; only the visible content is kept inside the work area
+        double pad = Pad * s.Scale;
+        Left = Math.Clamp(panelLeft ? cx - (Width - pad - ring) : cx - pad - ring, wa.Left - pad, Math.Max(wa.Left - pad, wa.Right - Width + pad));
+        Top = Math.Clamp(cy - Height / 2, wa.Top - pad, Math.Max(wa.Top - pad, wa.Bottom - Height + pad));
     }
 
     void BuildRing()
@@ -287,8 +293,8 @@ public partial class RadialWindow : Window
         {
             Panel.Visibility = Visibility.Visible;
             Animate(Panel, OpacityProperty, 1, 180, 0);
-            Animate(PanelPop, ScaleTransform.ScaleXProperty, 1, 220, 0.94);
-            Animate(PanelPop, ScaleTransform.ScaleYProperty, 1, 220, 0.94);
+            Animate(PanelPop, ScaleTransform.ScaleXProperty, 1, 220, 0.95);
+            Animate(PanelPop, ScaleTransform.ScaleYProperty, 1, 220, 0.95);
         }
         if (PanelContent.Content != content)
         {
