@@ -54,6 +54,15 @@ static class Native
         SendInput(2, [down, up], Marshal.SizeOf<INPUT>());
     }
 
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+
+    /// <summary>One mouse-wheel notch at the cursor; +1 = up.</summary>
+    public static void Wheel(int direction)
+    {
+        var i = new INPUT { type = 0, u = new InputUnion { mi = new MOUSEINPUT { mouseData = unchecked((uint)(120 * direction)), dwFlags = 0x0800 /* MOUSEEVENTF_WHEEL */ } } };
+        SendInput(1, [i], Marshal.SizeOf<INPUT>());
+    }
+
     /// <summary>Visible window bounds in pixels, without the invisible resize border/shadow.</summary>
     public static RECT WindowBounds(IntPtr hwnd)
     {

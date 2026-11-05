@@ -70,6 +70,7 @@ Depois disso, abra pelo Menu Iniciar ou ative **Ajustes → Iniciar com o Window
 
 ### Captura
 - **Tela** (o monitor do mouse), **Janela** (a que estava em foco) ou **Região** (a tela congela, você arrasta; Esc cancela).
+- **Página inteira**: rola a janela que estava em foco do topo até o fim e junta tudo numa imagem só (cabeçalhos fixos aparecem uma vez). Não mexa no mouse até terminar.
 - Copia para a área de transferência e/ou salva em `Imagens\Orbi`, em **PNG** ou **JPG**, pasta configurável.
 - Prévia da última captura com **Editar** (editor padrão do Windows) e **Pasta**.
 

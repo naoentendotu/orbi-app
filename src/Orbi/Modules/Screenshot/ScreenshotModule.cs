@@ -40,6 +40,8 @@ public sealed class ScreenshotModule : IModule
             Ui.Btn("Tela", () => Capture(Mode.Screen), "\uE7F4", "AccentBtn"),
             Ui.Btn("Janela", () => Capture(Mode.Window), "\uE737"),
             Ui.Btn("Região", () => Capture(Mode.Region), "\uF406")));
+        host.Children.Add(Ui.Row(Ui.Btn("Página inteira", () => Capture(Mode.Page), "",
+            tip: "Rola a janela de trás até o fim e junta tudo numa imagem. Não mexa no mouse até terminar.")));
 
         if (_s.Last != null && File.Exists(_s.Last))
         {
@@ -79,7 +81,7 @@ public sealed class ScreenshotModule : IModule
 
     void Save() => Storage.Save("screenshot.json", _s);
 
-    enum Mode { Screen, Window, Region }
+    enum Mode { Screen, Window, Region, Page }
 
     async void Capture(Mode mode)
     {
@@ -95,6 +97,7 @@ public sealed class ScreenshotModule : IModule
             var area = await RegionPicker.Pick(full);
             bmp = area is { } a ? full.Clone(new Drawing.Rectangle(a.X, a.Y, a.Width, a.Height), full.PixelFormat) : null;
         }
+        else if (mode == Mode.Page && target != IntPtr.Zero) bmp = await CapturePage(target);
         else if (mode == Mode.Window && target != IntPtr.Zero)
         {
             var r = Native.WindowBounds(target);
@@ -115,6 +118,100 @@ public sealed class ScreenshotModule : IModule
                 App.Notify("Captura", $"Falha ao salvar: {e.Message}", error: true);
             }
         }
+    }
+
+    /// <summary>Scrolls the window to the top, then down with the mouse wheel, gluing each new strip under the last.</summary>
+    static async Task<Drawing.Bitmap?> CapturePage(IntPtr target)
+    {
+        const int MaxSteps = 80, MaxHeight = 20000; // ~200 MB of pixels at 2560 wide
+        var r = Native.WindowBounds(target);
+        var rect = Drawing.Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+        if (rect.Width <= 0 || rect.Height <= 0) return null;
+        Native.GetCursorPos(out var back);
+        var center = new Drawing.Point(rect.Left + rect.Width / 2, rect.Top + rect.Height / 2);
+        var slices = new List<Drawing.Bitmap>();
+        var (prev, prevH) = await Settled(rect);
+        try
+        {
+            for (int i = 0; i < 20; i++) // back to the top: wheel up until nothing moves
+            {
+                await Wheel(center, +1, 25);
+                var (up, upH) = await Settled(rect);
+                bool still = PageStitch.Still(prevH, upH);
+                prev.Dispose();
+                (prev, prevH) = (up, upH);
+                if (still) break;
+            }
+
+            int top = 0, bottom = prev.Height, notches = 3, height = 0, misses = 0;
+            double perNotch = 0;
+            bool lost = false;
+            for (int step = 0; step < MaxSteps && height < MaxHeight && misses < 2; step++)
+            {
+                await Wheel(center, -1, notches);
+                var (next, nextH) = await Settled(rect);
+                if (slices.Count == 0) // first move: what didn't move is the fixed header/footer
+                {
+                    top = PageStitch.SameRows(prevH, nextH, fromBottom: false);
+                    bottom = Math.Max(top, prev.Height - PageStitch.SameRows(prevH, nextH, fromBottom: true));
+                }
+                int dy = bottom - top < 8 ? 0 : PageStitch.FindScroll(prevH, nextH, top, bottom);
+                if (dy < 0 && perNotch > 0 && PageStitch.Fits(prevH, nextH, top, bottom, (int)(perNotch * notches))) dy = (int)(perNotch * notches); // blank overlap: trust the measured scroll speed
+                if (dy < 0) { lost = true; next.Dispose(); break; }
+                if (dy == 0) { misses++; next.Dispose(); continue; } // end of page, or the app dropped the wheel: one more try
+                misses = 0;
+                if (slices.Count == 0) slices.Add(prev.Clone(new Drawing.Rectangle(0, 0, prev.Width, bottom), prev.PixelFormat)); // header + first screen
+                slices.Add(next.Clone(new Drawing.Rectangle(0, bottom - dy, next.Width, dy), next.PixelFormat));
+                height += dy;
+                perNotch = (double)dy / notches;
+                notches = Math.Clamp((int)(0.7 * (bottom - top) * notches / dy), 1, 15); // aim for ~70% of a screen per step, keeping overlap
+                prev.Dispose();
+                (prev, prevH) = (next, nextH);
+            }
+            if (slices.Count == 0) return prev.Clone(new Drawing.Rectangle(0, 0, prev.Width, prev.Height), prev.PixelFormat); // nothing scrolls
+            if (bottom < prev.Height) slices.Add(prev.Clone(new Drawing.Rectangle(0, bottom, prev.Width, prev.Height - bottom), prev.PixelFormat)); // footer
+            if (lost) App.Notify("Captura", "A página mudou durante a rolagem; a imagem foi cortada onde parou de bater.", error: true);
+            return PageStitch.Join(slices);
+        }
+        finally
+        {
+            prev.Dispose();
+            foreach (var s in slices) s.Dispose();
+            Native.SetCursorPos(back.X, back.Y);
+        }
+    }
+
+    /// <summary>
+    /// Notches one at a time, like a real wheel (some apps, e.g. WPF, drop wheel events that arrive in one batch),
+    /// with the cursor put back on the window each time: the wheel scrolls whatever is under it.
+    /// </summary>
+    static async Task Wheel(Drawing.Point at, int direction, int notches)
+    {
+        for (int i = 0; i < notches; i++)
+        {
+            Native.SetCursorPos(at.X, at.Y);
+            Native.Wheel(direction);
+            await Task.Delay(16);
+        }
+    }
+
+    /// <summary>Grabs until two frames in a row match, so smooth-scroll animations and slow apps have finished (gives up after ~1.5 s).</summary>
+    static async Task<(Drawing.Bitmap, int[])> Settled(Drawing.Rectangle rect)
+    {
+        await Task.Delay(120);
+        var bmp = Grab(rect)!;
+        var h = PageStitch.RowHashes(bmp);
+        for (int i = 0; i < 12; i++)
+        {
+            await Task.Delay(120);
+            var next = Grab(rect)!;
+            var nextH = PageStitch.RowHashes(next);
+            bmp.Dispose();
+            bool still = PageStitch.Still(h, nextH);
+            (bmp, h) = (next, nextH);
+            if (still) break;
+        }
+        return (bmp, h);
     }
 
     static Drawing.Bitmap? Grab(Drawing.Rectangle r)
